@@ -1,11 +1,10 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { ScrollView, Text, TextInput, View, Button, Image, ImageBackground, TouchableOpacity, StyleSheet } from 'react-native';
+import { Alert, ScrollView, Text, TextInput, View, Button, Image, ImageBackground, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { loginAttempt, loginSuccess, loginFailed } from '../redux/actions/auth'
-import Dimensions from 'Dimensions';
-// import { login } from '../api/auth';
-// import { axios } from 'react-native-axios'; 
+import { auth0, AUTH0_DOMAIN } from '../lib/auth';
+import { apiUser } from '../api/user';
 
 import { AccessToken, LoginManager, GraphRequestManager, GraphRequest } from 'react-native-fbsdk';
 
@@ -56,60 +55,40 @@ class Login extends Component {
         this.state = {
             email: '',
             password: '',
+            route: 'Login'
         };
-        LoginManager.logOut();
+
+        this.userLogin = this.userLogin.bind(this);
+        this.loginWindow = this.loginWindow.bind(this)
     }
 
-    _fbAuth() {
-        let self = this;
-        LoginManager.logInWithReadPermissions(['public_profile', 'email']).then(function (result) {
-            if (result.isCancelled) {                
-                console.log("Login Cancelled");
-            } else {
-
-                AccessToken.getCurrentAccessToken().then(
-                    (data) => {
-                        let accessToken = data.accessToken;
-
-                        const responseInfoCallback = (error, result) => {
-                            if (error) {
-                                console.log(error)
-                            } else {
-                                console.log(result)
-                                self.setState({
-                                    email: result.email
-                                });
-                                self.userLogin();
-                            }
-                        }
-
-                        const infoRequest = new GraphRequest(
-                            '/me',
-                            {
-                                accessToken: accessToken,
-                                parameters: {
-                                    fields: {
-                                        string: 'email,name,first_name,middle_name,last_name'
-                                    }
-                                }
-                            },
-                            responseInfoCallback
-                        );
-
-                        // Start the graph request.
-                        new GraphRequestManager().addRequest(infoRequest).start();
-
-                    })
-            }
-        }, function (error) {
-            console.log("some error occurred!!");
-        })
-    }
-
-    userLogin(e = null) {
-        this.props.loginSuccess(this.state);
-        if (e)
-            e.preventDefault();
+    userLogin(e) {
+        if (this.state.route === 'Login') {
+            auth0
+                .auth
+                .passwordRealm({ username: this.state.email, password: this.state.password, realm: "Username-Password-Authentication" })
+                .then(credentials => {
+                    this.getUserFromAuth0(credentials);
+                })
+                .catch(console.error);
+        } else {
+            auth0
+                .auth
+                .createUser({ email: this.state.email, username: this.state.email, password: this.state.password, connection: "Username-Password-Authentication" })
+                .then(credentials => {
+                    console.log(credentials);
+                    apiUser.create(credentials)
+                        .then(response => {
+                            this.setState({
+                                email: userinfo.email
+                            });
+                            this.props.loginSuccess(this.state);
+                        })
+                        .catch(console.error);
+                })
+                .catch(console.error);
+        }
+        e.preventDefault();
     }
 
     toggleRoute(e) {
@@ -118,7 +97,32 @@ class Login extends Component {
         e.preventDefault();
     }
 
+    loginWindow() {
+        auth0
+            .webAuth
+            .authorize({ scope: 'openid profile email', audience: `https://${AUTH0_DOMAIN}/userinfo`, useBrowser: false })
+            .then(credentials => {
+                this.getUserFromAuth0(credentials);
+            })
+            .catch(error => console.log(error));
+    }
+
+    getUserFromAuth0(credentials) {
+        auth0
+            .auth
+            .userInfo({ token: credentials.accessToken })
+            .then(userinfo => {
+                console.log(userinfo);
+                this.setState({
+                    email: userinfo.email
+                });
+                this.props.loginSuccess(this.state);
+            })
+            .catch(console.error);
+    }
+
     render() {
+        let alt = (this.state.route === 'Login') ? 'SignUp' : 'Login';
         return (
             <ImageBackground style={styles.imgBackground} resizeMode='cover' source={require('../assets/login_bg.jpg')}>
                 <ScrollView style={styles.container}>
@@ -126,15 +130,17 @@ class Login extends Component {
                         <Image resizeMode="contain" style={styles.logo} source={require('../assets/login_avatar.png')} />
                     </View>
                     <View style={[styles.socailButtonContainer, styles.marginBottom]}>
-                        <Icon.Button name="facebook" style={styles.socailButton} borderRadius={1} backgroundColor="#3b5998" onPress={this._fbAuth.bind(this)}>
-                            LOGIN WITH FACEBOOK
-                        </Icon.Button>
+                        <Button
+                            style={styles.socailButton}
+                            onPress={this.loginWindow}
+                            icon={
+                                <Icon name='facebook' color='white' />
+                            }
+                            iconRight
+                            title={"Social Login"}
+                        />
                     </View>
-                    <View style={[styles.socailButtonContainer, styles.marginBottom]}>
-                        <Icon.Button name="google" style={styles.socailButton} borderRadius={1} backgroundColor="#dc4e41" onPress={this._fbAuth.bind(this)}>
-                            LOGIN WITH GOOGLE
-                        </Icon.Button>
-                    </View>
+
                     <TextInput
                         placeholder='Email'
                         autoCapitalize='none'
@@ -159,9 +165,10 @@ class Login extends Component {
                     <View style={[styles.marginBottom]}>
                         <Button
                             onPress={(e) => this.userLogin(e)}
-                            title={"Login"}
+                            title={this.state.route}
                         />
                     </View>
+                    <Text style={{ fontSize: 16, color: 'blue' }} onPress={(e) => this.toggleRoute(e)}>{alt}</Text>
                 </ScrollView>
             </ImageBackground>
         );
@@ -182,3 +189,49 @@ const mapDispatchToProps = (dispatch) => {
 
 
 export default connect(mapStateToProps, mapDispatchToProps)(Login);
+
+    // _fbAuth() {
+    //     let self = this;
+    //     LoginManager.logInWithReadPermissions(['public_profile', 'email']).then(function (result) {
+    //         if (result.isCancelled) {
+    //             console.log("Login Cancelled");
+    //         } else {
+
+    //             AccessToken.getCurrentAccessToken().then(
+    //                 (data) => {
+    //                     let accessToken = data.accessToken;
+
+    //                     const responseInfoCallback = (error, result) => {
+    //                         if (error) {
+    //                             console.log(error)
+    //                         } else {
+    //                             console.log(result)
+    //                             self.setState({
+    //                                 email: result.email
+    //                             });
+    //                             self.userLogin();
+    //                         }
+    //                     }
+
+    //                     const infoRequest = new GraphRequest(
+    //                         '/me',
+    //                         {
+    //                             accessToken: accessToken,
+    //                             parameters: {
+    //                                 fields: {
+    //                                     string: 'email,name,first_name,middle_name,last_name'
+    //                                 }
+    //                             }
+    //                         },
+    //                         responseInfoCallback
+    //                     );
+
+    //                     // Start the graph request.
+    //                     new GraphRequestManager().addRequest(infoRequest).start();
+
+    //                 })
+    //         }
+    //     }, function (error) {
+    //         console.log("some error occurred!!");
+    //     })
+    // }
