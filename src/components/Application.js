@@ -6,11 +6,11 @@ import Home from './features/Home'
 
 class Application extends Component {
     render() {
-        if (this.props.isLoggedIn) {
+        // if (this.props.isLoggedIn) {
             return <Home />
-        } else {
-            return <Login />
-        }
+        // } else {
+        //     return <Login />
+        // }
     }
 }
 

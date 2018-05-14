@@ -4,7 +4,7 @@ import { Alert, ScrollView, Text, TextInput, View, Button, Image, ImageBackgroun
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { loginAttempt, loginSuccess, loginFailed } from '../redux/actions/auth'
 import { auth0, AUTH0_DOMAIN } from '../lib/auth';
-import { apiUser } from '../api/user';
+import apiUser from '../api/user';
 
 import { AccessToken, LoginManager, GraphRequestManager, GraphRequest } from 'react-native-fbsdk';
 
@@ -46,6 +46,10 @@ const styles = StyleSheet.create({
     socailButton: {
         width: 250,
         justifyContent: 'center'
+    },
+    error: {
+        borderWidth: 1,
+        borderColor: 'red'
     }
 });
 
@@ -55,14 +59,40 @@ class Login extends Component {
         this.state = {
             email: '',
             password: '',
+            isEmailValidate: true,
+            isPasswordValidate: true,
             route: 'Login'
         };
 
         this.userLogin = this.userLogin.bind(this);
         this.loginWindow = this.loginWindow.bind(this)
+        this.validate = this.validate.bind(this)
+    }
+
+    validate(text, type) {
+        if (type === 'email') {
+            let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+            if (reg.test(text)) {
+                this.setState({ isEmailValidate: true })
+            } else {
+                this.setState({ isEmailValidate: false })
+            }
+            this.setState({ email: text })
+        } else if (type === 'password') {
+            let reg = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})/;
+            if (reg.test(text)) {
+                this.setState({ isPasswordValidate: true })
+            } else {
+                this.setState({ isPasswordValidate: false })
+            }
+            this.setState({ password: text })
+        }
     }
 
     userLogin(e) {
+        if (!this.state.email) this.setState({ isEmailValidate: false })
+        if (!this.state.password) this.setState({ isPasswordValidate: false })
+        if (!this.isEmailValidate || !this.isPasswordValidate) return;
         if (this.state.route === 'Login') {
             auth0
                 .auth
@@ -149,8 +179,8 @@ class Login extends Component {
                         underlineColorAndroid='transparent'
                         keyboardType='email-address'
                         value={this.state.email}
-                        onChangeText={(text) => this.setState({ email: text })}
-                        style={[styles.marginBottom, styles.textInput]}
+                        onChangeText={(text) => this.validate(text, 'email')}
+                        style={[styles.marginBottom, styles.textInput, !this.state.isEmailValidate ? styles.error : null]}
                     />
                     <TextInput
                         placeholder='Password'
@@ -159,8 +189,8 @@ class Login extends Component {
                         underlineColorAndroid='transparent'
                         secureTextEntry={true}
                         value={this.state.password}
-                        onChangeText={(text) => this.setState({ password: text })}
-                        style={[styles.marginBottom, styles.textInput]}
+                        onChangeText={(text) => this.validate(text, 'password')}
+                        style={[styles.marginBottom, styles.textInput, !this.state.isPasswordValidate ? styles.error : null]}
                     />
                     <View style={[styles.marginBottom]}>
                         <Button

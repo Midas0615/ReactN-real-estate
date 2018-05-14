@@ -1,4 +1,4 @@
-import API_DOMAIN from '../../config/.env'
+import API_DOMAIN from '../../config/env'
 
 const userApiRoute = API_DOMAIN + '/api/user';
 
